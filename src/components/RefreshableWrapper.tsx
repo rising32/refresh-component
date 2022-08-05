@@ -1,12 +1,6 @@
-import React, {useEffect, useState} from 'react';
-import {
-  ActivityIndicator,
-  NativeScrollEvent,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {Gesture, GestureDetector} from 'react-native-gesture-handler';
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import Animated, {
   Extrapolate,
@@ -19,13 +13,14 @@ import Animated, {
   withSpring,
   withTiming,
   useAnimatedProps,
-} from 'react-native-reanimated';
-import {HitSlop} from 'react-native-gesture-handler/lib/typescript/handlers/gestureHandlerCommon';
-import Svg, {Circle} from 'react-native-svg';
+  withRepeat,
+} from "react-native-reanimated";
+import { HitSlop } from "react-native-gesture-handler/lib/typescript/handlers/gestureHandlerCommon";
+import Svg, { Circle } from "react-native-svg";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-type IStatus = 'init' | 'refreshing' | 'done';
+type IStatus = "init" | "refreshing" | "done";
 interface Props {
   isLoading: boolean;
   onRefresh: () => void;
@@ -49,7 +44,7 @@ const RefreshableWrapper = ({
   hitSlop,
   managedLoading = false,
 }: Props) => {
-  const [status, setStatus] = useState<IStatus>('init');
+  const [status, setStatus] = useState<IStatus>("init");
   const isRefreshing = useSharedValue(false);
   const loaderOffsetY = useSharedValue(0);
   const listContentOffsetY = useSharedValue(0);
@@ -66,13 +61,13 @@ const RefreshableWrapper = ({
       isLoaderActive.value = true;
     }
     if (isLoading) {
-      setStatus('refreshing');
-    } else if (status === 'refreshing') {
-      setStatus('done');
-    } else if (status === 'done') {
+      setStatus("refreshing");
+    } else if (status === "refreshing") {
+      setStatus("done");
+    } else if (status === "done") {
       setTimeout(() => {
-        setStatus('init');
-      }, 1000);
+        setStatus("init");
+      }, 500);
     }
   }, [
     isLoading,
@@ -84,24 +79,18 @@ const RefreshableWrapper = ({
     status,
   ]);
 
-  const onScroll = useAnimatedScrollHandler((event: NativeScrollEvent) => {
-    const y = event.contentOffset.y;
-
-    listContentOffsetY.value = y;
-
-    if (children.props.onScroll) {
-      runOnJS(children.props.onScroll)(event);
-    }
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      listContentOffsetY.value = event.contentOffset.y;
+    },
   });
 
   const native = Gesture.Native();
 
   const panGesture = Gesture.Pan()
-    .onUpdate(event => {
-      'worklet';
+    .onUpdate((event) => {
+      "worklet";
       isLoaderActive.value = loaderOffsetY.value > 0;
-      //   setOffsetY(event.translationY);
-      //   console.log(event.translationY);
 
       if (
         ((listContentOffsetY.value <= 0 && event.velocityY >= 0) ||
@@ -112,7 +101,7 @@ const RefreshableWrapper = ({
       }
     })
     .onEnd(() => {
-      'worklet';
+      "worklet";
       if (!isRefreshing.value) {
         if (loaderOffsetY.value >= refreshHeight && !isRefreshing.value) {
           isRefreshing.value = true;
@@ -145,7 +134,7 @@ const RefreshableWrapper = ({
                     loaderOffsetY.value,
                     [0, refreshHeight - 20],
                     [-10, 10],
-                    Extrapolate.CLAMP,
+                    Extrapolate.CLAMP
                   )
                 : withTiming(-10),
             },
@@ -168,7 +157,7 @@ const RefreshableWrapper = ({
                   loaderOffsetY.value,
                   [0, refreshHeight],
                   [0, refreshHeight],
-                  Extrapolate.CLAMP,
+                  Extrapolate.CLAMP
                 )
             : withTiming(0),
         },
@@ -181,60 +170,65 @@ const RefreshableWrapper = ({
   const innerRadius = radius - strokeWidth / 2;
   const circumfrence = 2 * Math.PI * innerRadius;
   const animatedProps = useAnimatedProps(() => {
-    if (contentOffset) {
-      console.log(contentOffset.value / 100);
-    }
     return {
-      strokeDashoffset: contentOffset
+      strokeDashoffset: isLoading
+        ? 0.75 * innerRadius * 2 * Math.PI
+        : contentOffset
         ? ((200 - contentOffset.value) / 200) * innerRadius * 2 * Math.PI
         : 0,
     };
   });
+  const rotateValue = useSharedValue(0);
+  const handleRotation = (value: any) => {
+    "worklet";
+    return `${value.value * 4 * Math.PI}rad`;
+  };
+  const rotateStyles = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: handleRotation(rotateValue) }],
+    };
+  });
+  useEffect(() => {
+    rotateValue.value = withRepeat(withSpring(0.5), -1, true);
+  }, []);
 
   return (
     <View style={styles.flex}>
       <Animated.View style={[styles.loaderContainer, loaderAnimation]}>
-        {status === 'init' && (
-          <>
-            <Text>Swipe down to refresh</Text>
-            <Svg
-              height='30'
-              width='30'
-              viewBox='0 0 30 30'
-              style={{
-                transform: [{rotateZ: '270deg'}],
-              }}>
-              <AnimatedCircle
-                cx={radius}
-                cy={radius}
-                r={innerRadius}
-                fill={'transparent'}
-                stroke={'gray'}
-                strokeWidth={strokeWidth}
-              />
-              <AnimatedCircle
-                cx={radius}
-                cy={radius}
-                r={innerRadius}
-                fill={'transparent'}
-                stroke={'blue'}
-                strokeDasharray={circumfrence}
-                strokeWidth={strokeWidth}
-                strokeDashoffset={2 * Math.PI}
-                strokeLinecap='round'
-                animatedProps={animatedProps}
-                style={{transform: [{rotateX: '90deg'}]}}
-              />
-            </Svg>
-          </>
-        )}
-        {status === 'refreshing' && (
-          <>
-            <Text>Refreshing...</Text>
-            <ActivityIndicator size='large' color='blue' />
-          </>
-        )}
-        {status === 'done' && <Text>Refreshing Done</Text>}
+        {status === "init" && <Text>Swipe down to refresh</Text>}
+        {status === "refreshing" && <Text>Refreshing...</Text>}
+        {status === "done" && <Text>Refreshing Done</Text>}
+        <Animated.View style={[isLoading ? rotateStyles : {}]}>
+          <Svg
+            height='30'
+            width='30'
+            viewBox='0 0 30 30'
+            style={{
+              transform: [{ rotateZ: "270deg" }],
+            }}
+          >
+            <AnimatedCircle
+              cx={radius}
+              cy={radius}
+              r={innerRadius}
+              fill={"transparent"}
+              stroke={"gray"}
+              strokeWidth={strokeWidth}
+            />
+            <AnimatedCircle
+              cx={radius}
+              cy={radius}
+              r={innerRadius}
+              fill={"transparent"}
+              stroke={"blue"}
+              strokeDasharray={circumfrence}
+              strokeWidth={strokeWidth}
+              strokeDashoffset={2 * Math.PI}
+              strokeLinecap='round'
+              animatedProps={animatedProps}
+            />
+          </Svg>
+        </Animated.View>
       </Animated.View>
 
       <GestureDetector gesture={panGesture}>
@@ -242,7 +236,7 @@ const RefreshableWrapper = ({
           <GestureDetector gesture={Gesture.Simultaneous(panGesture, native)}>
             {children &&
               React.cloneElement(children, {
-                onScroll: onScroll,
+                onScroll: scrollHandler,
                 bounces: bounces,
               })}
           </GestureDetector>
@@ -257,15 +251,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loaderContainer: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    width: '100%',
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    width: "100%",
     marginTop: 5,
   },
   loader: {
-    height: '100%',
-    width: '100%',
+    height: "100%",
+    width: "100%",
   },
 });
 
